@@ -1,7 +1,7 @@
 # Base32 in D
 
 This library provides a module for encoding and decoding the Base32 format, which is defined in [RFC 4648](http://tools.ietf.org/html/rfc4648).
-It is very affected by [Phobos' `std.base64`](http://dlang.org/phobos/std_base64.html).
+The implementation is very affected by [Phobos' `std.base64`](http://dlang.org/phobos/std_base64.html).
 
 ## Descriptions
 
@@ -24,7 +24,8 @@ If a `char` array which represents a Base32 encoded string is passed to `decode(
 ### More generally
 
 Actually, these functions take two parameters, *input* and *output*.
-You can use several types of arguments: an **array** or an **InputRange** as *input*, and, an **array** or an **OutputRange** as *output*. For example:
+You can use several types of arguments: an **array** or an **InputRange** as *input*, and, an **array** or an **OutputRange** as *output*.
+For example:
 
 ```d
 import std.stdio : writeln;
@@ -33,7 +34,7 @@ auto n = Base32.encode(data, &writeln!char);
 auto array = Base32.decode(SomeInputRangeWithLength(encoded), new ubyte[LARGE]);
 ```
 
-Note that the OutputRange versions returns not the data but the output length.
+Note that the OutputRange versions return not the data but the output length.
 On the other hand, if you use an array as an output buffer, it must be large enough to contain the result.
 There are convenient functions to calculate the length, `encodeLength()` and `decodeLength()`.
 Both of them take an input length and return the length which the output buffer must have.
@@ -45,13 +46,13 @@ Base32.encode(data, buffer);
 
 ### Varieties of the Base32 encodings
 
-The above examples describe the most standard Base32 encoding, though this module can handle some kinds of Base32 encodings.
+Although the above examples describe the most standard Base32 encoding, this module can handle some kinds of Base32 encodings.
 That is, the standard one containing A-Z, 2-7 and =, and "base32hex" containing 0-9, A-V, and =.
 Both are found in the RFC.
 They are aliased as `Base32` and `Base32Hex` respectively, by default.
 
 Moreover, no padding "=" versions, which are not in the RFC, are also available.
-These, however, should be defined manually.
+These, however, should be brought manually.
 To activate these varieties, two template parameters `UseHex` and `UsePad` are available.
 For example:
 
