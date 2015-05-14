@@ -609,6 +609,250 @@ template Base32Impl(UseHex useHex = UseHex.no, UsePad usePad= UsePad.yes)
     }
 
 
+    /**
+     * Creates an InputRange which lazily encodes $(D_PARAM source).
+     *
+     * Params:
+     *  source = An InputRange to _encode.
+     *
+     * Returns:
+     *  An InputRange which iterates over $(D_PARAM source) and lazily encodes it.
+     *  If $(D_PARAM source) is a ForwardRange, the returned range will be the same.
+     */
+    template encoder(Range) if (isInputRange!Range && is(ElementType!Range : ubyte))
+    {
+        //
+        auto encoder(Range source)
+        {
+            return Encoder(source);
+        }
+
+
+        struct Encoder
+        {
+            private
+            {
+                Range source;
+                bool _empty;
+                char _front;
+
+                static if (hasLength!Range)
+                {
+                    size_t _length;
+                }
+
+                size_t resultChunkIdx = 0;
+                size_t resultChunkLen = encResultChunkLength;
+                ubyte srcBuf0, srcBuf1;
+            }
+
+
+            this(Range source)
+            {
+                _empty = source.empty;
+
+                if (!_empty)
+                {
+                    static if (isForwardRange!Range)
+                    {
+                        this.source = source.save;
+                    }
+                    else
+                    {
+                        this.source = source;
+                    }
+
+                    static if (hasLength!Range)
+                    {
+                        _length = encodeLength(this.source.length);
+                    }
+
+                    _front = makeFront();
+                }
+            }
+
+            static if (isInfinite!Range)
+            {
+                enum empty = false;
+            }
+            else
+            {
+                @property @safe @nogc nothrow
+                bool empty() const
+                {
+                    static if (usePad)
+                    {
+                        return _empty && resultChunkIdx == 0;
+                    }
+                    else
+                    {
+                        return _empty;
+                    }
+                }
+            }
+
+            @property @safe
+            char front() const
+            {
+                if (empty)
+                {
+                    throw new Base32Exception("Cannot call front on Encoder with no data remaining");
+                }
+
+                return _front;
+            }
+
+            void popFront()
+            {
+                if (empty)
+                {
+                    throw new Base32Exception("Cannot call popFront on Encoder with no data remaining");
+                }
+
+                ++resultChunkIdx %= encResultChunkLength;
+
+                if (!_empty)
+                {
+                    _empty = resultChunkLen == resultChunkIdx;
+                }
+
+                static if (hasLength!Range)
+                {
+                    if (_length)
+                    {
+                        _length--;
+                    }
+                }
+
+                _front = makeFront();
+            }
+
+            static if (isForwardRange!Range)
+            {
+                @property
+                typeof(this) save()
+                {
+                    auto self = this;
+                    self.source = self.source.save;
+                    return self;
+                }
+            }
+
+            static if (hasLength!Range)
+            {
+                @property @safe @nogc nothrow
+                size_t length() const
+                {
+                    return _length;
+                }
+            }
+
+            private
+            char makeFront()
+            {
+                ubyte result;
+
+                final switch (resultChunkIdx)
+                {
+                case 0:
+                    if (source.empty)
+                    {
+                        srcBuf0 = 0;
+                        resultChunkLen = 0;
+                    }
+                    else
+                    {
+                        srcBuf0 = source.front;
+                        source.popFront();
+                        result = srcBuf0 >>> 3;
+                    }
+
+                    break;
+                case 1:
+                    if (source.empty)
+                    {
+                        srcBuf1 = 0;
+                        resultChunkLen = 2;
+                    }
+                    else
+                    {
+                        srcBuf1 = source.front;
+                        source.popFront();
+                    }
+
+                    result = (srcBuf0 << 2 | srcBuf1 >>> 6) & 0x1f;
+                    break;
+                case 2:
+                    result = srcBuf1 >>> 1 & 0x1f;
+                    break;
+                case 3:
+                    if (source.empty)
+                    {
+                        srcBuf0 = 0;
+                        resultChunkLen = 4;
+                    }
+                    else
+                    {
+                        srcBuf0 = source.front;
+                        source.popFront();
+                    }
+
+                    result = (srcBuf1 << 4 | srcBuf0 >>> 4) & 0x1f;
+                    break;
+                case 4:
+                    if (source.empty)
+                    {
+                        srcBuf1 = 0;
+                        resultChunkLen = 5;
+                    }
+                    else
+                    {
+                        srcBuf1 = source.front;
+                        source.popFront();
+                    }
+
+                    result = (srcBuf0 << 1 | srcBuf1 >>> 7) & 0x1f;
+                    break;
+                case 5:
+                    result = srcBuf1 >>> 2 & 0x1f;
+                    break;
+                case 6:
+                    if (source.empty)
+                    {
+                        srcBuf0 = 0;
+                        resultChunkLen = 7;
+                    }
+                    else
+                    {
+                        srcBuf0 = source.front;
+                        source.popFront();
+                    }
+
+                    result = (srcBuf1 << 3 | srcBuf0 >>> 5) & 0x1f;
+                    break;
+                case 7:
+                    if (source.empty)
+                    {
+                        resultChunkLen = 0;
+                    }
+
+                    result = srcBuf0 & 0x1f;
+                    break;
+                }
+
+                static if (usePad)
+                {
+                    return _empty ? pad : encodingMap(result);
+                }
+                else
+                {
+                    return encodingMap(result);
+                }
+            }
+        }
+    }
+
+
     // For decoding
     private enum size_t decSourceChunkLength = 8;
     private enum size_t decResultChunkLength = 5;
@@ -1858,6 +2102,73 @@ unittest
         assert(Base32HexNoPad.encode(toR("foobar"), app) == 10);
         assert(app.data == "CPNMUOJ1E8");
         app.clear();
+    }
+
+    // Encoder
+    {
+        import std.algorithm.comparison : equal;
+        import std.exception : assertThrown;
+
+        auto enc1 = Base32.encoder(toA(""));
+        assert(enc1.empty);
+        assert(enc1.length == 0);
+        assert(enc1.equal(""));
+        enc1 = Base32.encoder(toA("f"));
+        assert(enc1.length == 8);
+        assert(enc1.equal("MY======"));
+        enc1 = Base32.encoder(toA("fo"));
+        assert(enc1.length == 8);
+        assert(enc1.equal("MZXQ===="));
+        enc1 = Base32.encoder(toA("foo"));
+        assert(enc1.length == 8);
+        assert(enc1.equal("MZXW6==="));
+        enc1 = Base32.encoder(toA("foob"));
+        assert(enc1.length == 8);
+        assert(enc1.equal("MZXW6YQ="));
+        enc1 = Base32.encoder(toA("fooba"));
+        assert(enc1.length == 8);
+        assert(enc1.equal("MZXW6YTB"));
+        enc1 = Base32.encoder(toA("foobar"));
+        assert(enc1.length == 16);
+        assert(enc1.equal("MZXW6YTBOI======"));
+
+        auto enc2 = Base32NoPad.encoder(toA(""));
+        assert(enc2.empty);
+        assert(enc2.length == 0);
+        assert(enc2.equal(""));
+        enc2 = Base32NoPad.encoder(toA("f"));
+        assert(enc2.length == 2);
+        assert(enc2.equal("MY"));
+        enc2 = Base32NoPad.encoder(toA("fo"));
+        assert(enc2.length == 4);
+        assert(enc2.equal("MZXQ"));
+        enc2 = Base32NoPad.encoder(toA("foo"));
+        assert(enc2.length == 5);
+        assert(enc2.equal("MZXW6"));
+        enc2 = Base32NoPad.encoder(toA("foob"));
+        assert(enc2.length == 7);
+        assert(enc2.equal("MZXW6YQ"));
+        enc2 = Base32NoPad.encoder(toA("fooba"));
+        assert(enc2.length == 8);
+        assert(enc2.equal("MZXW6YTB"));
+        enc2 = Base32NoPad.encoder(toA("foobar"));
+        assert(enc2.length == 10);
+        assert(enc2.equal("MZXW6YTBOI"));
+
+        enc2 = Base32NoPad.encoder(toA("f"));
+        // assert(enc2.length == 2);
+        // assert(enc2.equal("MY"));
+        auto enc3 = enc2.save;
+        enc2.popFront();
+        enc2.popFront();
+        assert(enc2.empty);
+        assert(enc2.length == 0);
+        assert(enc2.equal(""));
+        assert(enc3.length == 2);
+        assert(enc3.equal("MY"));
+
+        assertThrown!Base32Exception(enc2.popFront());
+        assertThrown!Base32Exception(enc2.front);
     }
 }
 
