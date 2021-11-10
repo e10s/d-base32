@@ -67,7 +67,7 @@ template Base32Impl(UseHex useHex = UseHex.no, UsePad usePad= UsePad.yes)
         {
             assert(0 <= a && a <= 31);
         }
-        body
+        do
         {
             if (0 <= a && a <= 9)
             {
@@ -87,7 +87,7 @@ template Base32Impl(UseHex useHex = UseHex.no, UsePad usePad= UsePad.yes)
         {
             assert(0 <= a && a <= 31);
         }
-        body
+        do
         {
             if (0 <= a && a <= 25)
             {
@@ -169,7 +169,7 @@ template Base32Impl(UseHex useHex = UseHex.no, UsePad usePad= UsePad.yes)
         assert(result.length == encodeLength(source.length),
             "The length of result is different from Base32");
     }
-    body
+    do
     {
         immutable srcLen = source.length;
         if (srcLen == 0)
@@ -274,7 +274,7 @@ template Base32Impl(UseHex useHex = UseHex.no, UsePad usePad= UsePad.yes)
     {
         // delegate to the proxies
     }
-    body
+    do
     {
         immutable srcLen = source.length;
         if (srcLen == 0)
@@ -394,7 +394,7 @@ template Base32Impl(UseHex useHex = UseHex.no, UsePad usePad= UsePad.yes)
         assert(result == encodeLength(source.length),
             "The number of put is different from the length of Base32");
     }
-    body
+    do
     {
         immutable srcLen = source.length;
         if (srcLen == 0)
@@ -500,7 +500,7 @@ template Base32Impl(UseHex useHex = UseHex.no, UsePad usePad= UsePad.yes)
     {
         // delegate to the proxies
     }
-    body
+    do
     {
         immutable srcLen = source.length;
         if (srcLen == 0)
@@ -1015,7 +1015,7 @@ template Base32Impl(UseHex useHex = UseHex.no, UsePad usePad= UsePad.yes)
         assert(result.length == expect,
             "The result length is different from the expected");
     }
-    body
+    do
     {
         immutable actualLen = source.length;
 
@@ -1206,7 +1206,7 @@ template Base32Impl(UseHex useHex = UseHex.no, UsePad usePad= UsePad.yes)
     {
         // delegate to the proxies
     }
-    body
+    do
     {
         immutable actualLen = source.length;
 
@@ -1397,7 +1397,7 @@ template Base32Impl(UseHex useHex = UseHex.no, UsePad usePad= UsePad.yes)
         assert(result == expect,
                "The result is different from the expected");
     }
-    body
+    do
     {
         immutable actualLen = source.length;
 
@@ -1577,7 +1577,7 @@ template Base32Impl(UseHex useHex = UseHex.no, UsePad usePad= UsePad.yes)
     {
         // delegate to the proxies
     }
-    body
+    do
     {
         immutable actualLen = source.length;
 
